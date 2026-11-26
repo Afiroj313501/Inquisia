@@ -1,5 +1,6 @@
 """ORM models package."""
 
+from app.models.academic_profile import AcademicProfile
 from app.models.user import User
 
-__all__ = ["User"]
+__all__ = ["AcademicProfile", "User"]
