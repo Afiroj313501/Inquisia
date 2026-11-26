@@ -44,3 +44,20 @@ class User(Base):
         cascade="all, delete-orphan",
         order_by="InterestProfile.id.desc()",
     )
+    recommendation_sets = relationship(
+        "RecommendationSet",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="RecommendationSet.id.desc()",
+    )
+    topic_bookmarks = relationship(
+        "TopicBookmark",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="TopicBookmark.created_at.desc()",
+    )
+    topic_feedbacks = relationship(
+        "TopicFeedback",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
