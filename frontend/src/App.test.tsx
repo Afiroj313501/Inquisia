@@ -75,6 +75,14 @@ describe("App routing and protection", () => {
           )
         );
       }
+      if (url.endsWith("/api/v1/assessments/sessions/latest")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ detail: "No assessment session found." }),
+            { status: 404, headers: { "Content-Type": "application/json" } }
+          )
+        );
+      }
       return Promise.reject(new Error(`Unexpected URL: ${url}`));
     });
 

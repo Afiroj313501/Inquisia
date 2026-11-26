@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { AppLayout } from "../components/AppLayout";
 import { useAuth } from "../context/AuthContext";
+import { fetchLatestAssessmentSession } from "./AssessmentPage";
 import { fetchAcademicProfile } from "./ProfilePage";
 import {
   formatEducationLevel,
@@ -15,6 +16,13 @@ export function DashboardPage() {
     queryKey: ["profile"],
     queryFn: fetchAcademicProfile,
   });
+
+  const assessmentQuery = useQuery({
+    queryKey: ["assessment", "latest"],
+    queryFn: fetchLatestAssessmentSession,
+  });
+
+  const latestSession = assessmentQuery.data;
 
   return (
     <AppLayout>
@@ -32,6 +40,64 @@ export function DashboardPage() {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h3 className="text-base font-semibold text-slate-900">
+                Adaptive Research Assessment
+              </h3>
+              <p className="mt-1 text-sm text-slate-600">
+                Discover your research interests, methodology preferences, and
+                problem-solving style.
+              </p>
+            </div>
+            <Link
+              to="/assessment"
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
+            >
+              {latestSession?.status === "completed"
+                ? "View / Retake"
+                : latestSession
+                ? "Resume Assessment"
+                : "Start Assessment"}
+            </Link>
+          </div>
+
+          {assessmentQuery.isPending && (
+            <p className="mt-4 text-sm text-slate-500">
+              Checking assessment status...
+            </p>
+          )}
+
+          {assessmentQuery.isSuccess && latestSession && (
+            <div className="mt-5 border-t border-slate-200 pt-4">
+              <div className="flex items-center justify-between text-xs text-slate-600">
+                <span>
+                  Status:{" "}
+                  <strong className="font-medium text-slate-900">
+                    {latestSession.status === "completed"
+                      ? "Completed"
+                      : "In progress"}
+                  </strong>
+                </span>
+                <span>
+                  {latestSession.progress.answered_count} /{" "}
+                  {latestSession.progress.total_questions} answered (
+                  {latestSession.progress.progress_percent}%)
+                </span>
+              </div>
+              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-slate-900"
+                  style={{
+                    width: `${latestSession.progress.progress_percent}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h3 className="text-base font-semibold text-slate-900">
                 Academic Profile
               </h3>
               <p className="mt-1 text-sm text-slate-600">
@@ -41,7 +107,7 @@ export function DashboardPage() {
             </div>
             <Link
               to="/profile"
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
             >
               {profileQuery.data ? "Edit Profile" : "Complete Profile"}
             </Link>
