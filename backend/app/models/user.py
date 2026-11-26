@@ -32,3 +32,9 @@ class User(Base):
         uselist=False,
         cascade="all, delete-orphan",
     )
+    assessment_sessions = relationship(
+        "AssessmentSession",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="AssessmentSession.id.desc()",
+    )
