@@ -26,7 +26,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
+      <header className="border-b border-slate-200 bg-white print:hidden">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-6 py-4">
           <div className="flex items-center gap-6">
             <div>
@@ -53,6 +53,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
               </NavLink>
               <NavLink to="/recommendations" className={navLinkClass}>
                 Recommendations
+              </NavLink>
+              <NavLink to="/workspace" className={navLinkClass}>
+                Workspace
               </NavLink>
             </nav>
           </div>

@@ -7,6 +7,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { RecommendationsPage } from "./pages/RecommendationsPage";
 import { RegisterPage } from "./pages/RegisterPage";
+import { WorkspacePage } from "./pages/WorkspacePage";
 
 export default function App() {
   return (
@@ -50,6 +51,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <RecommendationsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/workspace"
+        element={
+          <ProtectedRoute>
+            <WorkspacePage />
           </ProtectedRoute>
         }
       />

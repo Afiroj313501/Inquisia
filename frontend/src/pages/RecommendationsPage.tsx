@@ -127,13 +127,21 @@ function TopicCard({
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-4">
-        <button
-          type="button"
-          onClick={() => setExpanded((prev) => !prev)}
-          className="text-xs font-medium text-slate-700 underline underline-offset-2 hover:text-slate-900"
-        >
-          {expanded ? "Hide score breakdown" : "Show score breakdown"}
-        </button>
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => setExpanded((prev) => !prev)}
+            className="text-xs font-medium text-slate-700 underline underline-offset-2 hover:text-slate-900"
+          >
+            {expanded ? "Hide score breakdown" : "Show score breakdown"}
+          </button>
+          <Link
+            to={`/workspace?topic=${encodeURIComponent(topic.id)}`}
+            className="text-xs font-medium text-indigo-700 underline underline-offset-2 hover:text-indigo-900"
+          >
+            Find Papers
+          </Link>
+        </div>
 
         <div className="flex items-center gap-2">
           <span className="text-xs text-slate-500">Rate relevance:</span>
