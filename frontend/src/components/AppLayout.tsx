@@ -51,6 +51,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
               <NavLink to="/interests" className={navLinkClass}>
                 Interest Profile
               </NavLink>
+              <NavLink to="/recommendations" className={navLinkClass}>
+                Recommendations
+              </NavLink>
             </nav>
           </div>
 

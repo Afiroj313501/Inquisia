@@ -5,6 +5,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { InterestsPage } from "./pages/InterestsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { RecommendationsPage } from "./pages/RecommendationsPage";
 import { RegisterPage } from "./pages/RegisterPage";
 
 export default function App() {
@@ -41,6 +42,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <InterestsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/recommendations"
+        element={
+          <ProtectedRoute>
+            <RecommendationsPage />
           </ProtectedRoute>
         }
       />

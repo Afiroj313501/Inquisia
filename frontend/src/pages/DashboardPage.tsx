@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { fetchLatestAssessmentSession } from "./AssessmentPage";
 import { fetchLatestInterestProfile } from "./InterestsPage";
 import { fetchAcademicProfile } from "./ProfilePage";
+import { fetchLatestRecommendations } from "./RecommendationsPage";
 import {
   formatEducationLevel,
   formatExperienceLevel,
@@ -28,8 +29,14 @@ export function DashboardPage() {
     queryFn: fetchLatestInterestProfile,
   });
 
+  const recommendationsQuery = useQuery({
+    queryKey: ["recommendations", "latest"],
+    queryFn: fetchLatestRecommendations,
+  });
+
   const latestSession = assessmentQuery.data;
   const interestProfile = interestQuery.data;
+  const recommendationSet = recommendationsQuery.data;
 
   return (
     <AppLayout>
@@ -131,6 +138,42 @@ export function DashboardPage() {
                   className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-800"
                 >
                   {d.label} ({d.score}%)
+                </span>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h3 className="text-base font-semibold text-slate-900">
+                Topic Recommendations
+              </h3>
+              <p className="mt-1 text-sm text-slate-600">
+                AI-assisted hybrid research topic matches, bookmarks, and
+                explainable fit scores.
+              </p>
+            </div>
+            <Link
+              to="/recommendations"
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+            >
+              {recommendationSet ? "View Recommendations" : "Explore Topics"}
+            </Link>
+          </div>
+
+          {recommendationsQuery.isSuccess && recommendationSet && (
+            <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-4">
+              <span className="text-xs font-medium text-slate-500">
+                Top matches:
+              </span>
+              {recommendationSet.results.slice(0, 2).map((topic) => (
+                <span
+                  key={topic.id}
+                  className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-800"
+                >
+                  {topic.title} ({topic.hybrid_score}/100)
                 </span>
               ))}
             </div>
