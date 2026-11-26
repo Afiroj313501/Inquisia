@@ -61,3 +61,9 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+    saved_papers = relationship(
+        "SavedPaper",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="SavedPaper.created_at.desc()",
+    )
