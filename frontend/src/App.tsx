@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AssessmentPage } from "./pages/AssessmentPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { InterestsPage } from "./pages/InterestsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { RegisterPage } from "./pages/RegisterPage";
@@ -32,6 +33,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <AssessmentPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/interests"
+        element={
+          <ProtectedRoute>
+            <InterestsPage />
           </ProtectedRoute>
         }
       />

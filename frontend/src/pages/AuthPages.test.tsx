@@ -75,6 +75,14 @@ describe("Auth pages", () => {
           )
         );
       }
+      if (url.endsWith("/api/v1/interests/latest")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ detail: "No interest profile has been generated yet." }),
+            { status: 404, headers: { "Content-Type": "application/json" } }
+          )
+        );
+      }
       return Promise.reject(new Error(`Unexpected URL: ${url}`));
     });
 
