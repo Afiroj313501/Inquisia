@@ -59,6 +59,14 @@ describe("Auth pages", () => {
           )
         );
       }
+      if (url.endsWith("/api/v1/profile")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ detail: "Academic profile has not been created yet." }),
+            { status: 404, headers: { "Content-Type": "application/json" } }
+          )
+        );
+      }
       return Promise.reject(new Error(`Unexpected URL: ${url}`));
     });
 
