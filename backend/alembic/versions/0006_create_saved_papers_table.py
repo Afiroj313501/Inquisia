@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 revision: str = "0006_create_saved_papers"
-down_revision: Union[str, None] = "0005_create_recommendation_tables"
+down_revision: Union[str, None] = "0005_create_recommendations"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
