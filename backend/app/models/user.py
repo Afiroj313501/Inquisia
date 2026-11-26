@@ -38,3 +38,9 @@ class User(Base):
         cascade="all, delete-orphan",
         order_by="AssessmentSession.id.desc()",
     )
+    interest_profiles = relationship(
+        "InterestProfile",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="InterestProfile.id.desc()",
+    )
