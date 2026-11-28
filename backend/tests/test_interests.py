@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+import pytest
 
 
 def _auth_headers(client: TestClient, email: str = "interest@example.edu") -> dict[str, str]:
@@ -97,3 +98,65 @@ def test_analyze_and_fetch_explainable_interest_profile(client: TestClient) -> N
     latest_res = client.get("/api/v1/interests/latest", headers=headers)
     assert latest_res.status_code == 200
     assert latest_res.json()["id"] == body["id"]
+
+
+def test_niche_summary_generation_and_caching(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    headers = _auth_headers(client, "niche_user@example.edu")
+
+    # Requires an interest profile first
+    assert client.post("/api/v1/interests/niche-summary", headers=headers).status_code == 400
+    assert client.get("/api/v1/interests/niche-summary", headers=headers).status_code == 404
+
+    _complete_sample_assessment(client, headers)
+    assert client.post("/api/v1/interests/analyze", headers=headers).status_code == 200
+
+    class _WithKeySettings:
+        gemini_api_key = "test-gemini-key"
+        gemini_model = "gemini-2.5-flash"
+
+    class _FakeGeminiResp:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "text": (
+                                        '{"niche_title": "Empirical Scientific NLP Systems",'
+                                        ' "summary": "Combines NLP and empirical ML evaluation.",'
+                                        ' "example_directions": ["Citation-grounded retrieval"]}'
+                                    )
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+
+    calls = 0
+
+    def _counting_post(*args: object, **kwargs: object) -> _FakeGeminiResp:
+        nonlocal calls
+        calls += 1
+        return _FakeGeminiResp()
+
+    monkeypatch.setattr("app.services.brief_service.get_settings", lambda: _WithKeySettings())
+    monkeypatch.setattr("app.services.brief_service.httpx.post", _counting_post)
+
+    res = client.post("/api/v1/interests/niche-summary", headers=headers)
+    assert res.status_code == 200
+    assert res.json()["niche_title"] == "Empirical Scientific NLP Systems"
+    assert calls == 1
+
+    # Second POST hits cache
+    assert client.post("/api/v1/interests/niche-summary", headers=headers).status_code == 200
+    assert calls == 1
+
+    # GET returns cached
+    assert client.get("/api/v1/interests/niche-summary", headers=headers).status_code == 200

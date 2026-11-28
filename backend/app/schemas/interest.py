@@ -51,3 +51,15 @@ class InterestProfileResponse(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class NicheSummaryResponse(BaseModel):
+    """Optional AI-generated interdisciplinary niche summary derived from an InterestProfile."""
+
+    interest_profile_id: int
+    top_domains: list[str]
+    model: str
+    niche_title: str
+    summary: str
+    example_directions: list[str]
+    ai_generated_notice: str

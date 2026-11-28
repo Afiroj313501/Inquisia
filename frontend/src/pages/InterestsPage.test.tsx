@@ -127,6 +127,28 @@ describe("InterestsPage", () => {
         });
       }
 
+      if (url.endsWith("/api/v1/interests/niche-summary") && (!init?.method || init.method === "GET")) {
+        return new Response(JSON.stringify({ detail: "Not cached" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      if (url.includes("/api/v1/interests/niche-summary") && init?.method === "POST") {
+        return new Response(
+          JSON.stringify({
+            interest_profile_id: 3,
+            top_domains: ["Natural Language Processing & Information Retrieval"],
+            model: "gemini-2.5-flash",
+            niche_title: "Empirical Scientific NLP",
+            summary: "Blends NLP retrieval with empirical benchmarking.",
+            example_directions: ["Citation-grounded QA"],
+            ai_generated_notice: "AI-generated exploratory niche synthesis.",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
       throw new Error(`Unexpected request: ${url}`);
     });
 
@@ -150,6 +172,14 @@ describe("InterestsPage", () => {
       expect(
         screen.getByText(/not scientifically validated psychometric assessments/i)
       ).toBeInTheDocument();
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Generate AI Niche Summary" })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Empirical Scientific NLP")).toBeInTheDocument();
     });
   });
 });

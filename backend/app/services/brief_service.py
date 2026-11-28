@@ -8,8 +8,10 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.models.ai_artifact import AiArtifact
 from app.models.saved_paper import SavedPaper
+from app.schemas.interest import NicheSummaryResponse
 from app.schemas.paper import LiteratureSynthesisResponse
 from app.schemas.recommendation import ResearchBriefResponse
+from app.services.interest_analysis_service import DOMAIN_LABELS, get_latest_interest_profile
 from app.services.profile_service import get_profile_by_user_id
 from app.services.topic_catalog import TOPIC_MAP
 
@@ -315,3 +317,107 @@ def synthesize_saved_papers(
         synthesis.model_dump(mode="json"),
     )
     return synthesis
+
+
+def get_cached_niche_summary(db: Session, user_id: int) -> NicheSummaryResponse:
+    """Return cached interdisciplinary niche summary for the user's latest interest profile."""
+    interest_profile = get_latest_interest_profile(db, user_id)
+    if interest_profile is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No interest profile has been generated yet.",
+        )
+    cached = _get_cached_artifact(
+        db, user_id, "niche_summary", str(interest_profile.id)
+    )
+    if cached is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No cached niche summary yet.",
+        )
+    return NicheSummaryResponse.model_validate(cached.payload)
+
+
+def generate_niche_summary(
+    db: Session,
+    user_id: int,
+    *,
+    refresh: bool = False,
+) -> NicheSummaryResponse:
+    """Generate (or return cached) Gemini interdisciplinary niche summary."""
+    interest_profile = get_latest_interest_profile(db, user_id)
+    if interest_profile is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Generate an interest profile before requesting a niche summary.",
+        )
+
+    target_key = str(interest_profile.id)
+    if not refresh:
+        cached = _get_cached_artifact(db, user_id, "niche_summary", target_key)
+        if cached is not None:
+            return NicheSummaryResponse.model_validate(cached.payload)
+
+    domain_summary = ", ".join(
+        f"{entry['label']} ({entry['score']}/100)"
+        for entry in interest_profile.domain_scores[:3]
+    )
+    dimension_summary = ", ".join(
+        f"{entry['label']} ({entry['score']}/100)"
+        for entry in interest_profile.dimension_scores[:2]
+    )
+    top_domain_labels = [
+        DOMAIN_LABELS.get(k, k) for k in interest_profile.top_domains
+    ]
+
+    profile = get_profile_by_user_id(db, user_id)
+    profile_line = (
+        f"Academic background: {profile.education_level} in {profile.degree_program}; "
+        f"career goals: {profile.career_goals or 'Not specified'}."
+        if profile is not None
+        else "No academic profile provided."
+    )
+
+    prompt = (
+        f"You are an academic research advisor.\n"
+        f"Top interest domains: {domain_summary}\n"
+        f"Top methodology dimensions: {dimension_summary}\n"
+        f"{profile_line}\n\n"
+        f"Synthesize how these strengths intersect into a realistic interdisciplinary "
+        f"research niche for an early-stage researcher.\n"
+        f"Rules:\n"
+        f"- Do NOT invent or cite any papers, authors, or DOIs.\n"
+        f"- Return ONLY valid JSON with keys:\n"
+        f'  "niche_title": string (short 4-8 word title),\n'
+        f'  "summary": string (2-3 concise sentences),\n'
+        f'  "example_directions": array of 3 concise exploratory direction strings.'
+    )
+
+    parsed, model_name = _call_gemini_json(prompt)
+    directions_raw = parsed.get("example_directions")
+
+    niche = NicheSummaryResponse(
+        interest_profile_id=interest_profile.id,
+        top_domains=top_domain_labels,
+        model=model_name,
+        niche_title=str(parsed.get("niche_title", "Interdisciplinary Research Niche")),
+        summary=str(parsed.get("summary", "")),
+        example_directions=(
+            [str(d) for d in directions_raw[:5]]
+            if isinstance(directions_raw, list)
+            else []
+        ),
+        ai_generated_notice=(
+            "AI-generated exploratory niche synthesis based on your interest scores. "
+            "Use it as inspiration alongside peer-reviewed literature."
+        ),
+    )
+    _upsert_artifact(
+        db,
+        user_id,
+        "niche_summary",
+        target_key,
+        model_name,
+        niche.model_dump(mode="json"),
+    )
+    return niche

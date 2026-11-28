@@ -16,7 +16,11 @@ import {
 } from "recharts";
 import { AppLayout } from "../components/AppLayout";
 import { ApiError, apiRequest } from "../lib/api";
-import type { InterestProfile, ScoreEntry } from "../types/interest";
+import type {
+  InterestProfile,
+  NicheSummaryResponse,
+  ScoreEntry,
+} from "../types/interest";
 
 export async function fetchLatestInterestProfile(): Promise<InterestProfile | null> {
   try {
@@ -96,6 +100,39 @@ export function InterestsPage() {
   });
 
   const profile = interestQuery.data;
+
+  const nicheQuery = useQuery({
+    queryKey: ["interests", "niche-summary", profile?.id],
+    enabled: Boolean(profile?.id),
+    queryFn: async () => {
+      try {
+        return await apiRequest<NicheSummaryResponse>(
+          "/api/v1/interests/niche-summary"
+        );
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) {
+          return null;
+        }
+        throw err;
+      }
+    },
+  });
+
+  const nicheMutation = useMutation({
+    mutationFn: (refresh: boolean) =>
+      apiRequest<NicheSummaryResponse>(
+        `/api/v1/interests/niche-summary${refresh ? "?refresh=true" : ""}`,
+        { method: "POST" }
+      ),
+    onSuccess: (data) => {
+      queryClient.setQueryData(
+        ["interests", "niche-summary", data.interest_profile_id],
+        data
+      );
+    },
+  });
+
+  const activeNiche = nicheMutation.data ?? nicheQuery.data ?? null;
 
   return (
     <AppLayout>
@@ -285,6 +322,71 @@ export function InterestsPage() {
                 Methodology & Limitations:
               </strong>{" "}
               {profile.limitations_note}
+            </section>
+
+            <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-semibold text-slate-900">
+                    Interdisciplinary Niche Summary
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Optional Gemini synthesis of how your top domains and
+                    methodology preferences intersect.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={nicheMutation.isPending}
+                  onClick={() => nicheMutation.mutate(Boolean(activeNiche))}
+                  className="rounded-lg border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
+                >
+                  {nicheMutation.isPending
+                    ? "Generating..."
+                    : activeNiche
+                    ? "Regenerate Niche Summary"
+                    : "Generate AI Niche Summary"}
+                </button>
+              </div>
+
+              {nicheMutation.isError && (
+                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900">
+                  {nicheMutation.error instanceof Error
+                    ? nicheMutation.error.message
+                    : "Unable to generate niche summary."}
+                </div>
+              )}
+
+              {activeNiche && (
+                <div className="mt-4 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-5 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-slate-900">
+                      {activeNiche.niche_title}
+                    </span>
+                    <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-medium text-amber-900">
+                      AI-Generated · {activeNiche.model}
+                    </span>
+                  </div>
+                  <p className="leading-relaxed text-slate-700">
+                    {activeNiche.summary}
+                  </p>
+                  {activeNiche.example_directions.length > 0 && (
+                    <div>
+                      <strong className="text-slate-900">
+                        Exploratory Directions:
+                      </strong>
+                      <ul className="mt-1 list-disc space-y-1 pl-4 text-slate-700">
+                        {activeNiche.example_directions.map((dir, idx) => (
+                          <li key={idx}>{dir}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <p className="text-[11px] text-slate-500">
+                    {activeNiche.ai_generated_notice}
+                  </p>
+                </div>
+              )}
             </section>
 
             <section className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">

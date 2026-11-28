@@ -32,3 +32,13 @@ export interface InterestProfile {
   created_at: string;
   updated_at: string;
 }
+
+export interface NicheSummaryResponse {
+  interest_profile_id: number;
+  top_domains: string[];
+  model: string;
+  niche_title: string;
+  summary: string;
+  example_directions: string[];
+  ai_generated_notice: string;
+}
