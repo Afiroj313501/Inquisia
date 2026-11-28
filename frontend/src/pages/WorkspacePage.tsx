@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AppLayout } from "../components/AppLayout";
 import { apiRequest } from "../lib/api";
+import { formatSavedPapersBibtex } from "../lib/bibtex";
 import type {
   LiteratureSynthesisResponse,
   PaperItem,
@@ -254,6 +255,19 @@ export function WorkspacePage() {
     URL.revokeObjectURL(url);
   }
 
+  function handleDownloadBibtex() {
+    const saved = savedPapersQuery.data ?? [];
+    if (saved.length === 0) return;
+    const bibtex = formatSavedPapersBibtex(saved);
+    const blob = new Blob([bibtex], { type: "application/x-bibtex;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "inquisia-references.bib";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -478,19 +492,29 @@ export function WorkspacePage() {
                 Save at least 2 OpenAlex papers to run AI literature synthesis.
               </p>
             </div>
-            <button
-              type="button"
-              disabled={
-                (savedPapersQuery.data?.length ?? 0) < 2 ||
-                synthesizeMutation.isPending
-              }
-              onClick={() => synthesizeMutation.mutate(activeTopic?.id)}
-              className="rounded-lg border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 print:hidden"
-            >
-              {synthesizeMutation.isPending
-                ? "Synthesizing..."
-                : "Synthesize Saved Papers"}
-            </button>
+            <div className="flex flex-wrap items-center gap-2 print:hidden">
+              <button
+                type="button"
+                disabled={(savedPapersQuery.data?.length ?? 0) === 0}
+                onClick={handleDownloadBibtex}
+                className="rounded-lg border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Export BibTeX (.bib)
+              </button>
+              <button
+                type="button"
+                disabled={
+                  (savedPapersQuery.data?.length ?? 0) < 2 ||
+                  synthesizeMutation.isPending
+                }
+                onClick={() => synthesizeMutation.mutate(activeTopic?.id)}
+                className="rounded-lg border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {synthesizeMutation.isPending
+                  ? "Synthesizing..."
+                  : "Synthesize Saved Papers"}
+              </button>
+            </div>
           </div>
 
           {synthesizeMutation.isError && (
