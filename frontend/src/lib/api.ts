@@ -1,4 +1,8 @@
 const TOKEN_STORAGE_KEY = "inquisia_access_token";
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(
+  /\/+$/,
+  ""
+);
 
 export class ApiError extends Error {
   status: number;
@@ -37,7 +41,8 @@ export async function apiRequest<T>(
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(path, {
+  const url = path.startsWith("http") ? path : `${API_BASE_URL}${path}`;
+  const response = await fetch(url, {
     ...options,
     headers,
   });

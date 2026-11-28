@@ -27,6 +27,16 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    @property
+    def sqlalchemy_database_url(self) -> str:
+        """Normalize postgres:// or postgresql:// URLs to use psycopg v3."""
+        url = self.database_url
+        if url.startswith("postgres://"):
+            return "postgresql+psycopg://" + url[len("postgres://") :]
+        if url.startswith("postgresql://"):
+            return "postgresql+psycopg://" + url[len("postgresql://") :]
+        return url
+
 
 @lru_cache
 def get_settings() -> Settings:
