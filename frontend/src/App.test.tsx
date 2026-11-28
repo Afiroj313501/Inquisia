@@ -30,6 +30,18 @@ describe("App routing and protection", () => {
     vi.restoreAllMocks();
   });
 
+  it("renders landing page at / for unauthenticated visitors", async () => {
+    renderApp(["/"]);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", {
+          name: "Discover your research interests. Find a realistic direction.",
+        })
+      ).toBeInTheDocument();
+    });
+  });
+
   it("redirects unauthenticated users from /dashboard to /login", async () => {
     renderApp(["/dashboard"]);
 

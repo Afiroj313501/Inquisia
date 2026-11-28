@@ -38,16 +38,86 @@ export function DashboardPage() {
   const interestProfile = interestQuery.data;
   const recommendationSet = recommendationsQuery.data;
 
+  const journeySteps = [
+    {
+      label: "Academic Profile",
+      done: Boolean(profileQuery.data),
+      to: "/profile",
+    },
+    {
+      label: "Assessment",
+      done: latestSession?.status === "completed",
+      to: "/assessment",
+    },
+    {
+      label: "Interest Profile",
+      done: Boolean(interestProfile),
+      to: "/interests",
+    },
+    {
+      label: "Topic Recommendations",
+      done: Boolean(recommendationSet),
+      to: "/recommendations",
+    },
+  ];
+  const completedSteps = journeySteps.filter((s) => s.done).length;
+  const nextStep = journeySteps.find((s) => !s.done);
+
   return (
     <AppLayout>
       <div className="space-y-6">
         <section className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">
-            Welcome, {user?.full_name}
-          </h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Signed in as <span className="font-medium">{user?.email}</span>
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">
+                Welcome, {user?.full_name}
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Signed in as <span className="font-medium">{user?.email}</span>
+              </p>
+            </div>
+            {nextStep && (
+              <Link
+                to={nextStep.to}
+                className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-medium text-white shadow-sm transition hover:bg-slate-800"
+              >
+                Next: {nextStep.label}
+              </Link>
+            )}
+          </div>
+
+          <div className="mt-6 border-t border-slate-200 pt-5">
+            <div className="flex items-center justify-between text-xs text-slate-500">
+              <span className="font-medium text-slate-700">Research Journey</span>
+              <span>
+                {completedSteps} of {journeySteps.length} completed
+              </span>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-4">
+              {journeySteps.map((step, idx) => (
+                <Link
+                  key={step.to}
+                  to={step.to}
+                  className={
+                    step.done
+                      ? "flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-xs font-medium text-emerald-900"
+                      : "flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                  }
+                >
+                  <span
+                    className={
+                      step.done
+                        ? "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[11px] font-semibold text-white"
+                        : "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[11px] font-semibold text-slate-700"
+                    }
+                  >
+                    {step.done ? "✓" : idx + 1}
+                  </span>
+                  <span className="truncate">{step.label}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
         </section>
 
         <section className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
