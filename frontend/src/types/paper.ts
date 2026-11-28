@@ -49,3 +49,13 @@ export interface SavedPaperResponse {
   abstract: string | null;
   created_at: string;
 }
+
+export interface LiteratureSynthesisResponse {
+  paper_count: number;
+  paper_titles: string[];
+  model: string;
+  common_themes: string[];
+  methodological_gaps: string[];
+  next_step_recommendation: string;
+  ai_generated_notice: string;
+}

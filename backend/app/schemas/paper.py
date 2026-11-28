@@ -54,3 +54,13 @@ class SavedPaperResponse(BaseModel):
     open_access_url: str | None
     abstract: str | None
     created_at: datetime
+
+
+class LiteratureSynthesisResponse(BaseModel):
+    paper_count: int
+    paper_titles: list[str]
+    model: str
+    common_themes: list[str]
+    methodological_gaps: list[str]
+    next_step_recommendation: str
+    ai_generated_notice: str

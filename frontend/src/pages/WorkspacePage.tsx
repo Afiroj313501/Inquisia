@@ -4,6 +4,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { AppLayout } from "../components/AppLayout";
 import { apiRequest } from "../lib/api";
 import type {
+  LiteratureSynthesisResponse,
   PaperItem,
   PaperSearchResponse,
   SavedPaperResponse,
@@ -154,6 +155,16 @@ export function WorkspacePage() {
         `/api/v1/recommendations/${topicId}/brief`,
         { method: "POST" }
       ),
+  });
+
+  const synthesizeMutation = useMutation({
+    mutationFn: (topicId?: string) => {
+      const qs = topicId ? `?topic_id=${encodeURIComponent(topicId)}` : "";
+      return apiRequest<LiteratureSynthesisResponse>(
+        `/api/v1/papers/synthesize${qs}`,
+        { method: "POST" }
+      );
+    },
   });
 
   const savedOpenAlexIds = useMemo(
@@ -458,9 +469,74 @@ export function WorkspacePage() {
 
         {/* Saved Literature Library */}
         <section className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-          <h3 className="text-base font-semibold text-slate-900">
-            Saved Literature ({savedPapersQuery.data?.length ?? 0})
-          </h3>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-semibold text-slate-900">
+                Saved Literature ({savedPapersQuery.data?.length ?? 0})
+              </h3>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Save at least 2 OpenAlex papers to run AI literature synthesis.
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={
+                (savedPapersQuery.data?.length ?? 0) < 2 ||
+                synthesizeMutation.isPending
+              }
+              onClick={() => synthesizeMutation.mutate(activeTopic?.id)}
+              className="rounded-lg border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 print:hidden"
+            >
+              {synthesizeMutation.isPending
+                ? "Synthesizing..."
+                : "Synthesize Saved Papers"}
+            </button>
+          </div>
+
+          {synthesizeMutation.isError && (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900">
+              {synthesizeMutation.error instanceof Error
+                ? synthesizeMutation.error.message
+                : "Unable to synthesize saved papers."}
+            </div>
+          )}
+
+          {synthesizeMutation.isSuccess && (
+            <div className="mt-4 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-5 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-semibold text-slate-900">
+                  AI Literature Synthesis ({synthesizeMutation.data.paper_count}{" "}
+                  papers · {synthesizeMutation.data.model})
+                </span>
+                <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-medium text-amber-900">
+                  AI-Generated
+                </span>
+              </div>
+              <div>
+                <strong className="text-slate-900">Common Themes:</strong>
+                <ul className="mt-1 list-disc space-y-1 pl-4 text-slate-700">
+                  {synthesizeMutation.data.common_themes.map((theme, idx) => (
+                    <li key={idx}>{theme}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <strong className="text-slate-900">Methodological Gaps:</strong>
+                <ul className="mt-1 list-disc space-y-1 pl-4 text-slate-700">
+                  {synthesizeMutation.data.methodological_gaps.map((gap, idx) => (
+                    <li key={idx}>{gap}</li>
+                  ))}
+                </ul>
+              </div>
+              <p className="leading-relaxed text-slate-700">
+                <strong className="text-slate-900">Recommended Next Step:</strong>{" "}
+                {synthesizeMutation.data.next_step_recommendation}
+              </p>
+              <p className="text-[11px] text-slate-500">
+                {synthesizeMutation.data.ai_generated_notice}
+              </p>
+            </div>
+          )}
           {savedPapersQuery.isPending && (
             <p className="mt-3 text-sm text-slate-500">Loading saved papers...</p>
           )}

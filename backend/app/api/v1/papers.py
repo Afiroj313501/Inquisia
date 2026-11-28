@@ -6,10 +6,12 @@ from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.paper import (
+    LiteratureSynthesisResponse,
     PaperSearchResponse,
     SavePaperRequest,
     SavedPaperResponse,
 )
+from app.services.brief_service import synthesize_saved_papers
 from app.services.paper_service import (
     list_saved_papers,
     remove_saved_paper,
@@ -73,3 +75,13 @@ def delete_saved_paper(
 ) -> None:
     """Remove a saved academic paper from the user's workspace."""
     remove_saved_paper(db, current_user.id, saved_paper_id)
+
+
+@router.post("/synthesize", response_model=LiteratureSynthesisResponse)
+def synthesize_literature(
+    topic_id: str | None = Query(default=None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> LiteratureSynthesisResponse:
+    """Synthesize common themes and gaps across the user's saved OpenAlex papers."""
+    return synthesize_saved_papers(db, current_user.id, topic_id=topic_id)

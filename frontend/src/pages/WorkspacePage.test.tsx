@@ -83,7 +83,23 @@ describe("WorkspacePage", () => {
   });
 
   it("searches OpenAlex papers, saves a paper, and renders comparison & roadmap", async () => {
-    let savedList: Array<Record<string, unknown>> = [];
+    let savedList: Array<Record<string, unknown>> = [
+      {
+        id: 11,
+        openalex_id: "W100",
+        topic_id: "nlp_scientific_rag",
+        title: "Existing Saved Paper",
+        authors: ["Ada Researcher"],
+        publication_year: 2024,
+        venue: "EMNLP",
+        cited_by_count: 15,
+        doi: null,
+        url: null,
+        open_access_url: null,
+        abstract: "Baseline scientific retrieval study.",
+        created_at: "2026-11-27T00:30:00Z",
+      },
+    ];
 
     vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
       const url = typeof input === "string" ? input : input.toString();
@@ -194,7 +210,7 @@ describe("WorkspacePage", () => {
           abstract: "A study on grounded scientific QA.",
           created_at: "2026-11-27T01:10:00Z",
         };
-        savedList = [saved];
+        savedList = [saved, ...savedList];
         return Promise.resolve(
           new Response(JSON.stringify(saved), {
             status: 201,
@@ -214,6 +230,22 @@ describe("WorkspacePage", () => {
               research_questions: ["RQ1: How often do citations entail claims?"],
               suggested_methodology: "Compare BM25 + dense retrieval baselines.",
               ai_generated_notice: "AI-generated exploratory research brief.",
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          )
+        );
+      }
+      if (url.includes("/api/v1/papers/synthesize") && method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              paper_count: 2,
+              paper_titles: ["Grounded Scientific QA with Retrieval", "Existing Saved Paper"],
+              model: "gemini-2.5-flash",
+              common_themes: ["Scientific retrieval grounding"],
+              methodological_gaps: ["Cross-domain citation verification"],
+              next_step_recommendation: "Compare citation precision across both baselines.",
+              ai_generated_notice: "AI-generated synthesis grounded strictly in your saved OpenAlex papers.",
             }),
             { status: 200, headers: { "Content-Type": "application/json" } }
           )
@@ -246,7 +278,17 @@ describe("WorkspacePage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save Paper" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Saved Literature (1)")).toBeInTheDocument();
+      expect(screen.getByText("Saved Literature (2)")).toBeInTheDocument();
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Synthesize Saved Papers" })
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Scientific retrieval grounding")
+      ).toBeInTheDocument();
     });
 
     fireEvent.click(
