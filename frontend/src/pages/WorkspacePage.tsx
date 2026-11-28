@@ -12,7 +12,10 @@ import {
   formatExperienceLevel,
   type ResearchExperienceLevel,
 } from "../types/profile";
-import { formatDomainTag } from "../types/recommendation";
+import {
+  formatDomainTag,
+  type ResearchBriefResponse,
+} from "../types/recommendation";
 import { fetchAcademicProfile } from "./ProfilePage";
 import { fetchLatestRecommendations } from "./RecommendationsPage";
 
@@ -143,6 +146,14 @@ export function WorkspacePage() {
         (prev) => (prev ? prev.filter((item) => item.id !== deletedId) : [])
       );
     },
+  });
+
+  const briefMutation = useMutation({
+    mutationFn: (topicId: string) =>
+      apiRequest<ResearchBriefResponse>(
+        `/api/v1/recommendations/${topicId}/brief`,
+        { method: "POST" }
+      ),
   });
 
   const savedOpenAlexIds = useMemo(
@@ -605,9 +616,66 @@ export function WorkspacePage() {
         {/* Skill Gap & Exploratory Research Roadmap */}
         {activeTopic && skillGapAnalysis && (
           <section className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-            <h3 className="text-base font-semibold text-slate-900">
-              Skill Gap & Exploratory Roadmap: {activeTopic.title}
-            </h3>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-base font-semibold text-slate-900">
+                Skill Gap & Exploratory Roadmap: {activeTopic.title}
+              </h3>
+              <button
+                type="button"
+                disabled={briefMutation.isPending}
+                onClick={() => briefMutation.mutate(activeTopic.id)}
+                className="rounded-lg border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60 print:hidden"
+              >
+                {briefMutation.isPending
+                  ? "Generating Brief..."
+                  : "Generate AI Research Brief"}
+              </button>
+            </div>
+
+            {briefMutation.isError && (
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900">
+                {briefMutation.error instanceof Error
+                  ? briefMutation.error.message
+                  : "Unable to generate AI research brief."}
+              </div>
+            )}
+
+            {briefMutation.isSuccess &&
+              briefMutation.data.topic_id === activeTopic.id && (
+                <div className="mt-4 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-5 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-semibold text-slate-900">
+                      AI-Generated Exploratory Brief ({briefMutation.data.model})
+                    </span>
+                    <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-medium text-amber-900">
+                      AI-Generated
+                    </span>
+                  </div>
+                  <p className="leading-relaxed text-slate-700">
+                    <strong className="text-slate-900">Problem Framing:</strong>{" "}
+                    {briefMutation.data.problem_framing}
+                  </p>
+                  <div>
+                    <strong className="text-slate-900">
+                      Starter Research Questions:
+                    </strong>
+                    <ul className="mt-1 list-disc space-y-1 pl-4 text-slate-700">
+                      {briefMutation.data.research_questions.map((rq, idx) => (
+                        <li key={idx}>{rq}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <p className="leading-relaxed text-slate-700">
+                    <strong className="text-slate-900">
+                      Suggested Methodology:
+                    </strong>{" "}
+                    {briefMutation.data.suggested_methodology}
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    {briefMutation.data.ai_generated_notice}
+                  </p>
+                </div>
+              )}
 
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">

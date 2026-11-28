@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+import pytest
 
 
 def _auth_headers(client: TestClient, email: str = "rec_user@example.edu") -> dict[str, str]:
@@ -164,3 +165,67 @@ def test_generate_hybrid_recommendations_bookmarks_and_feedback(client: TestClie
         ).status_code
         == 404
     )
+
+
+def test_topic_brief_requires_key_or_calls_gemini(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    headers = _auth_headers(client, "brief_user@example.edu")
+
+    # Unknown topic -> 404
+    assert (
+        client.post("/api/v1/recommendations/unknown_topic/brief", headers=headers).status_code
+        == 404
+    )
+
+    # Missing GEMINI_API_KEY -> 503
+    class _NoKeySettings:
+        gemini_api_key = None
+        gemini_model = "gemini-2.5-flash"
+
+    monkeypatch.setattr("app.services.brief_service.get_settings", lambda: _NoKeySettings())
+    assert (
+        client.post("/api/v1/recommendations/nlp_scientific_rag/brief", headers=headers).status_code
+        == 503
+    )
+
+    # Configured GEMINI_API_KEY -> 200 with structured brief
+    class _WithKeySettings:
+        gemini_api_key = "test-gemini-key"
+        gemini_model = "gemini-2.5-flash"
+
+    class _FakeGeminiResp:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "text": (
+                                        '{"problem_framing": "Ground RAG outputs in citations.",'
+                                        ' "research_questions": ["RQ1: How to detect unsupported claims?"],'
+                                        ' "suggested_methodology": "Evaluate on a small verified subset."}'
+                                    )
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+
+    monkeypatch.setattr("app.services.brief_service.get_settings", lambda: _WithKeySettings())
+    monkeypatch.setattr(
+        "app.services.brief_service.httpx.post",
+        lambda *args, **kwargs: _FakeGeminiResp(),
+    )
+
+    res = client.post("/api/v1/recommendations/nlp_scientific_rag/brief", headers=headers)
+    assert res.status_code == 200
+    body = res.json()
+    assert body["topic_id"] == "nlp_scientific_rag"
+    assert "AI-generated exploratory research brief" in body["ai_generated_notice"]
+    assert body["research_questions"] == ["RQ1: How to detect unsupported claims?"]

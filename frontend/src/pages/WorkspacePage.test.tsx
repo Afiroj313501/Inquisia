@@ -202,6 +202,23 @@ describe("WorkspacePage", () => {
           })
         );
       }
+      if (url.endsWith("/api/v1/recommendations/nlp_scientific_rag/brief") && method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              topic_id: "nlp_scientific_rag",
+              topic_title:
+                "Citation-Grounded Retrieval-Augmented Generation for Science",
+              model: "gemini-2.5-flash",
+              problem_framing: "Evaluate citation fidelity in scientific RAG.",
+              research_questions: ["RQ1: How often do citations entail claims?"],
+              suggested_methodology: "Compare BM25 + dense retrieval baselines.",
+              ai_generated_notice: "AI-generated exploratory research brief.",
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          )
+        );
+      }
       return Promise.reject(new Error(`Unexpected URL: ${url}`));
     });
 
@@ -230,6 +247,16 @@ describe("WorkspacePage", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Saved Literature (1)")).toBeInTheDocument();
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Generate AI Research Brief" })
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("RQ1: How often do citations entail claims?")
+      ).toBeInTheDocument();
     });
   });
 });

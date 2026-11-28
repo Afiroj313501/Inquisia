@@ -61,3 +61,13 @@ class FeedbackResponse(BaseModel):
     comment: str | None
     created_at: datetime
     updated_at: datetime
+
+
+class ResearchBriefResponse(BaseModel):
+    topic_id: str
+    topic_title: str
+    model: str
+    problem_framing: str
+    research_questions: list[str]
+    suggested_methodology: str
+    ai_generated_notice: str

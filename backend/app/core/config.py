@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     openalex_api_base_url: str = "https://api.openalex.org"
     openalex_mailto: str | None = None
 
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-2.5-flash"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

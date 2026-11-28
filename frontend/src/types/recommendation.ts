@@ -50,6 +50,16 @@ export interface FeedbackResponse {
   updated_at: string;
 }
 
+export interface ResearchBriefResponse {
+  topic_id: string;
+  topic_title: string;
+  model: string;
+  problem_framing: string;
+  research_questions: string[];
+  suggested_methodology: string;
+  ai_generated_notice: string;
+}
+
 export const DOMAIN_TAG_LABELS: Record<string, string> = {
   ai_ml: "AI & ML",
   nlp: "NLP & IR",
