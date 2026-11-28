@@ -41,3 +41,14 @@ Run frontend tests and build:
 npm test
 npm run build
 ```
+
+## Docker Compose (Full Stack)
+
+Run PostgreSQL, FastAPI (with automatic `alembic upgrade head`), and the Nginx-served React app together:
+
+```bash
+docker compose up --build
+```
+
+- Frontend: `http://localhost:5173`
+- Backend API Docs: `http://localhost:8000/docs`
