@@ -217,10 +217,20 @@ def test_topic_brief_requires_key_or_calls_gemini(
                 ]
             }
 
+    call_count = 0
+
+    def _counting_post(*args: object, **kwargs: object) -> _FakeGeminiResp:
+        nonlocal call_count
+        call_count += 1
+        return _FakeGeminiResp()
+
     monkeypatch.setattr("app.services.brief_service.get_settings", lambda: _WithKeySettings())
-    monkeypatch.setattr(
-        "app.services.brief_service.httpx.post",
-        lambda *args, **kwargs: _FakeGeminiResp(),
+    monkeypatch.setattr("app.services.brief_service.httpx.post", _counting_post)
+
+    # Not cached yet -> 404
+    assert (
+        client.get("/api/v1/recommendations/nlp_scientific_rag/brief", headers=headers).status_code
+        == 404
     )
 
     res = client.post("/api/v1/recommendations/nlp_scientific_rag/brief", headers=headers)
@@ -229,3 +239,21 @@ def test_topic_brief_requires_key_or_calls_gemini(
     assert body["topic_id"] == "nlp_scientific_rag"
     assert "AI-generated exploratory research brief" in body["ai_generated_notice"]
     assert body["research_questions"] == ["RQ1: How to detect unsupported claims?"]
+    assert call_count == 1
+
+    # Second POST without refresh hits PostgreSQL/SQLite cache (no extra Gemini call)
+    cached_res = client.post("/api/v1/recommendations/nlp_scientific_rag/brief", headers=headers)
+    assert cached_res.status_code == 200
+    assert call_count == 1
+
+    # GET returns cached brief
+    get_res = client.get("/api/v1/recommendations/nlp_scientific_rag/brief", headers=headers)
+    assert get_res.status_code == 200
+    assert get_res.json()["research_questions"] == ["RQ1: How to detect unsupported claims?"]
+
+    # refresh=true bypasses cache
+    ref_res = client.post(
+        "/api/v1/recommendations/nlp_scientific_rag/brief?refresh=true", headers=headers
+    )
+    assert ref_res.status_code == 200
+    assert call_count == 2

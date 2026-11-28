@@ -1,10 +1,12 @@
 import json
+from typing import Any
 from fastapi import HTTPException, status
 import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.models.ai_artifact import AiArtifact
 from app.models.saved_paper import SavedPaper
 from app.schemas.paper import LiteratureSynthesisResponse
 from app.schemas.recommendation import ResearchBriefResponse
@@ -71,18 +73,85 @@ def _call_gemini_json(prompt: str) -> tuple[dict[str, object], str]:
         ) from exc
 
 
-def generate_topic_brief(
+def _get_cached_artifact(
+    db: Session,
+    user_id: int,
+    artifact_type: str,
+    target_key: str,
+) -> AiArtifact | None:
+    return db.scalar(
+        select(AiArtifact).where(
+            AiArtifact.user_id == user_id,
+            AiArtifact.artifact_type == artifact_type,
+            AiArtifact.target_key == target_key,
+        )
+    )
+
+
+def _upsert_artifact(
+    db: Session,
+    user_id: int,
+    artifact_type: str,
+    target_key: str,
+    model: str,
+    payload: dict[str, Any],
+) -> None:
+    existing = _get_cached_artifact(db, user_id, artifact_type, target_key)
+    if existing is None:
+        db.add(
+            AiArtifact(
+                user_id=user_id,
+                artifact_type=artifact_type,
+                target_key=target_key,
+                model=model,
+                payload=payload,
+            )
+        )
+    else:
+        existing.model = model
+        existing.payload = payload
+    db.commit()
+
+
+def get_cached_topic_brief(
     db: Session,
     user_id: int,
     topic_id: str,
 ) -> ResearchBriefResponse:
-    """Generate an optional Gemini-powered exploratory research brief for a topic."""
+    """Return a previously generated topic brief from cache, or 404 if none exists."""
+    if topic_id not in TOPIC_MAP:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Unknown research topic '{topic_id}'.",
+        )
+    cached = _get_cached_artifact(db, user_id, "topic_brief", topic_id)
+    if cached is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No cached research brief for this topic yet.",
+        )
+    return ResearchBriefResponse.model_validate(cached.payload)
+
+
+def generate_topic_brief(
+    db: Session,
+    user_id: int,
+    topic_id: str,
+    *,
+    refresh: bool = False,
+) -> ResearchBriefResponse:
+    """Generate (or return cached) Gemini-powered exploratory research brief for a topic."""
     topic = TOPIC_MAP.get(topic_id)
     if topic is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Unknown research topic '{topic_id}'.",
         )
+
+    if not refresh:
+        cached = _get_cached_artifact(db, user_id, "topic_brief", topic_id)
+        if cached is not None:
+            return ResearchBriefResponse.model_validate(cached.payload)
 
     profile = get_profile_by_user_id(db, user_id)
     saved_papers = list(
@@ -127,7 +196,7 @@ def generate_topic_brief(
         else []
     )
 
-    return ResearchBriefResponse(
+    brief = ResearchBriefResponse(
         topic_id=topic.id,
         topic_title=topic.title,
         model=model_name,
@@ -136,14 +205,53 @@ def generate_topic_brief(
         suggested_methodology=str(parsed.get("suggested_methodology", "")),
         ai_generated_notice=_AI_NOTICE,
     )
+    _upsert_artifact(
+        db,
+        user_id,
+        "topic_brief",
+        topic_id,
+        model_name,
+        brief.model_dump(mode="json"),
+    )
+    return brief
+
+
+def get_latest_literature_synthesis(
+    db: Session,
+    user_id: int,
+) -> LiteratureSynthesisResponse:
+    """Return the user's most recent cached literature synthesis, or 404 if none."""
+    cached = db.scalar(
+        select(AiArtifact)
+        .where(
+            AiArtifact.user_id == user_id,
+            AiArtifact.artifact_type == "literature_synthesis",
+        )
+        .order_by(AiArtifact.updated_at.desc())
+        .limit(1)
+    )
+    if cached is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No cached literature synthesis yet.",
+        )
+    return LiteratureSynthesisResponse.model_validate(cached.payload)
 
 
 def synthesize_saved_papers(
     db: Session,
     user_id: int,
     topic_id: str | None = None,
+    *,
+    refresh: bool = False,
 ) -> LiteratureSynthesisResponse:
-    """Synthesize common themes and gaps across a user's real saved OpenAlex papers."""
+    """Synthesize (or return cached) themes and gaps across saved OpenAlex papers."""
+    target_key = topic_id or "all"
+    if not refresh:
+        cached = _get_cached_artifact(db, user_id, "literature_synthesis", target_key)
+        if cached is not None:
+            return LiteratureSynthesisResponse.model_validate(cached.payload)
+
     papers = list(
         db.scalars(
             select(SavedPaper)
@@ -185,7 +293,7 @@ def synthesize_saved_papers(
     themes_raw = parsed.get("common_themes")
     gaps_raw = parsed.get("methodological_gaps")
 
-    return LiteratureSynthesisResponse(
+    synthesis = LiteratureSynthesisResponse(
         paper_count=len(papers),
         paper_titles=[p.title for p in papers],
         model=model_name,
@@ -198,3 +306,12 @@ def synthesize_saved_papers(
         next_step_recommendation=str(parsed.get("next_step_recommendation", "")),
         ai_generated_notice=_SYNTHESIS_NOTICE,
     )
+    _upsert_artifact(
+        db,
+        user_id,
+        "literature_synthesis",
+        target_key,
+        model_name,
+        synthesis.model_dump(mode="json"),
+    )
+    return synthesis

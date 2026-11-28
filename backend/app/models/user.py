@@ -67,3 +67,9 @@ class User(Base):
         cascade="all, delete-orphan",
         order_by="SavedPaper.created_at.desc()",
     )
+    ai_artifacts = relationship(
+        "AiArtifact",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="AiArtifact.updated_at.desc()",
+    )

@@ -11,7 +11,10 @@ from app.schemas.paper import (
     SavePaperRequest,
     SavedPaperResponse,
 )
-from app.services.brief_service import synthesize_saved_papers
+from app.services.brief_service import (
+    get_latest_literature_synthesis,
+    synthesize_saved_papers,
+)
 from app.services.paper_service import (
     list_saved_papers,
     remove_saved_paper,
@@ -77,11 +80,21 @@ def delete_saved_paper(
     remove_saved_paper(db, current_user.id, saved_paper_id)
 
 
+@router.get("/synthesize/latest", response_model=LiteratureSynthesisResponse)
+def read_latest_synthesis(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> LiteratureSynthesisResponse:
+    """Retrieve the user's most recent cached literature synthesis."""
+    return get_latest_literature_synthesis(db, current_user.id)
+
+
 @router.post("/synthesize", response_model=LiteratureSynthesisResponse)
 def synthesize_literature(
     topic_id: str | None = Query(default=None),
+    refresh: bool = Query(default=False),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> LiteratureSynthesisResponse:
     """Synthesize common themes and gaps across the user's saved OpenAlex papers."""
-    return synthesize_saved_papers(db, current_user.id, topic_id=topic_id)
+    return synthesize_saved_papers(db, current_user.id, topic_id=topic_id, refresh=refresh)

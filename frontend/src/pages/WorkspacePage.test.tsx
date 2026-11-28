@@ -218,7 +218,23 @@ describe("WorkspacePage", () => {
           })
         );
       }
-      if (url.endsWith("/api/v1/recommendations/nlp_scientific_rag/brief") && method === "POST") {
+      if (url.endsWith("/api/v1/recommendations/nlp_scientific_rag/brief") && method === "GET") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ detail: "Not cached" }), {
+            status: 404,
+            headers: { "Content-Type": "application/json" },
+          })
+        );
+      }
+      if (url.endsWith("/api/v1/papers/synthesize/latest") && method === "GET") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ detail: "Not cached" }), {
+            status: 404,
+            headers: { "Content-Type": "application/json" },
+          })
+        );
+      }
+      if (url.includes("/api/v1/recommendations/nlp_scientific_rag/brief") && method === "POST") {
         return Promise.resolve(
           new Response(
             JSON.stringify({

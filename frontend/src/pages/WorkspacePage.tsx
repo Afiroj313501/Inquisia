@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AppLayout } from "../components/AppLayout";
-import { apiRequest } from "../lib/api";
+import { ApiError, apiRequest } from "../lib/api";
 import { formatSavedPapersBibtex } from "../lib/bibtex";
 import type {
   LiteratureSynthesisResponse,
@@ -48,6 +48,22 @@ export function WorkspacePage() {
     queryFn: () => apiRequest<SavedPaperResponse[]>("/api/v1/papers/saved"),
   });
 
+  const cachedSynthesisQuery = useQuery({
+    queryKey: ["papers", "synthesis", "latest"],
+    queryFn: async () => {
+      try {
+        return await apiRequest<LiteratureSynthesisResponse>(
+          "/api/v1/papers/synthesize/latest"
+        );
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) {
+          return null;
+        }
+        throw err;
+      }
+    },
+  });
+
   const topics = recQuery.data?.results ?? [];
   const bookmarkedTopics = useMemo(
     () => topics.filter((t) => t.is_bookmarked),
@@ -78,6 +94,23 @@ export function WorkspacePage() {
     () => topics.find((t) => t.id === selectedTopicId) ?? topics[0] ?? null,
     [topics, selectedTopicId]
   );
+
+  const cachedBriefQuery = useQuery({
+    queryKey: ["recommendations", "brief", activeTopic?.id],
+    enabled: Boolean(activeTopic?.id),
+    queryFn: async () => {
+      try {
+        return await apiRequest<ResearchBriefResponse>(
+          `/api/v1/recommendations/${activeTopic!.id}/brief`
+        );
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) {
+          return null;
+        }
+        throw err;
+      }
+    },
+  });
 
   const searchMutation = useMutation({
     mutationFn: (params: {
@@ -151,22 +184,39 @@ export function WorkspacePage() {
   });
 
   const briefMutation = useMutation({
-    mutationFn: (topicId: string) =>
+    mutationFn: ({ topicId, refresh = false }: { topicId: string; refresh?: boolean }) =>
       apiRequest<ResearchBriefResponse>(
-        `/api/v1/recommendations/${topicId}/brief`,
+        `/api/v1/recommendations/${topicId}/brief${refresh ? "?refresh=true" : ""}`,
         { method: "POST" }
       ),
+    onSuccess: (data) => {
+      queryClient.setQueryData(["recommendations", "brief", data.topic_id], data);
+    },
   });
 
   const synthesizeMutation = useMutation({
-    mutationFn: (topicId?: string) => {
-      const qs = topicId ? `?topic_id=${encodeURIComponent(topicId)}` : "";
+    mutationFn: ({ topicId, refresh = false }: { topicId?: string; refresh?: boolean }) => {
+      const qs = new URLSearchParams();
+      if (topicId) qs.set("topic_id", topicId);
+      if (refresh) qs.set("refresh", "true");
+      const queryStr = qs.toString();
       return apiRequest<LiteratureSynthesisResponse>(
-        `/api/v1/papers/synthesize${qs}`,
+        `/api/v1/papers/synthesize${queryStr ? `?${queryStr}` : ""}`,
         { method: "POST" }
       );
     },
+    onSuccess: (data) => {
+      queryClient.setQueryData(["papers", "synthesis", "latest"], data);
+    },
   });
+
+  const activeBrief =
+    briefMutation.data?.topic_id === activeTopic?.id
+      ? briefMutation.data
+      : cachedBriefQuery.data ?? null;
+
+  const activeSynthesis =
+    synthesizeMutation.data ?? cachedSynthesisQuery.data ?? null;
 
   const savedOpenAlexIds = useMemo(
     () => new Set((savedPapersQuery.data ?? []).map((p) => p.openalex_id)),
@@ -507,11 +557,18 @@ export function WorkspacePage() {
                   (savedPapersQuery.data?.length ?? 0) < 2 ||
                   synthesizeMutation.isPending
                 }
-                onClick={() => synthesizeMutation.mutate(activeTopic?.id)}
+                onClick={() =>
+                  synthesizeMutation.mutate({
+                    topicId: activeTopic?.id,
+                    refresh: Boolean(activeSynthesis),
+                  })
+                }
                 className="rounded-lg border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {synthesizeMutation.isPending
                   ? "Synthesizing..."
+                  : activeSynthesis
+                  ? "Regenerate Synthesis"
                   : "Synthesize Saved Papers"}
               </button>
             </div>
@@ -525,12 +582,12 @@ export function WorkspacePage() {
             </div>
           )}
 
-          {synthesizeMutation.isSuccess && (
+          {activeSynthesis && (
             <div className="mt-4 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-5 text-xs">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-semibold text-slate-900">
-                  AI Literature Synthesis ({synthesizeMutation.data.paper_count}{" "}
-                  papers · {synthesizeMutation.data.model})
+                  AI Literature Synthesis ({activeSynthesis.paper_count}{" "}
+                  papers · {activeSynthesis.model})
                 </span>
                 <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-medium text-amber-900">
                   AI-Generated
@@ -539,7 +596,7 @@ export function WorkspacePage() {
               <div>
                 <strong className="text-slate-900">Common Themes:</strong>
                 <ul className="mt-1 list-disc space-y-1 pl-4 text-slate-700">
-                  {synthesizeMutation.data.common_themes.map((theme, idx) => (
+                  {activeSynthesis.common_themes.map((theme, idx) => (
                     <li key={idx}>{theme}</li>
                   ))}
                 </ul>
@@ -547,17 +604,17 @@ export function WorkspacePage() {
               <div>
                 <strong className="text-slate-900">Methodological Gaps:</strong>
                 <ul className="mt-1 list-disc space-y-1 pl-4 text-slate-700">
-                  {synthesizeMutation.data.methodological_gaps.map((gap, idx) => (
+                  {activeSynthesis.methodological_gaps.map((gap, idx) => (
                     <li key={idx}>{gap}</li>
                   ))}
                 </ul>
               </div>
               <p className="leading-relaxed text-slate-700">
                 <strong className="text-slate-900">Recommended Next Step:</strong>{" "}
-                {synthesizeMutation.data.next_step_recommendation}
+                {activeSynthesis.next_step_recommendation}
               </p>
               <p className="text-[11px] text-slate-500">
-                {synthesizeMutation.data.ai_generated_notice}
+                {activeSynthesis.ai_generated_notice}
               </p>
             </div>
           )}
@@ -723,11 +780,18 @@ export function WorkspacePage() {
               <button
                 type="button"
                 disabled={briefMutation.isPending}
-                onClick={() => briefMutation.mutate(activeTopic.id)}
+                onClick={() =>
+                  briefMutation.mutate({
+                    topicId: activeTopic.id,
+                    refresh: Boolean(activeBrief),
+                  })
+                }
                 className="rounded-lg border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60 print:hidden"
               >
                 {briefMutation.isPending
                   ? "Generating Brief..."
+                  : activeBrief
+                  ? "Regenerate AI Brief"
                   : "Generate AI Research Brief"}
               </button>
             </div>
@@ -740,12 +804,11 @@ export function WorkspacePage() {
               </div>
             )}
 
-            {briefMutation.isSuccess &&
-              briefMutation.data.topic_id === activeTopic.id && (
+            {activeBrief && (
                 <div className="mt-4 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-5 text-xs">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-semibold text-slate-900">
-                      AI-Generated Exploratory Brief ({briefMutation.data.model})
+                      AI-Generated Exploratory Brief ({activeBrief.model})
                     </span>
                     <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-medium text-amber-900">
                       AI-Generated
@@ -753,14 +816,14 @@ export function WorkspacePage() {
                   </div>
                   <p className="leading-relaxed text-slate-700">
                     <strong className="text-slate-900">Problem Framing:</strong>{" "}
-                    {briefMutation.data.problem_framing}
+                    {activeBrief.problem_framing}
                   </p>
                   <div>
                     <strong className="text-slate-900">
                       Starter Research Questions:
                     </strong>
                     <ul className="mt-1 list-disc space-y-1 pl-4 text-slate-700">
-                      {briefMutation.data.research_questions.map((rq, idx) => (
+                      {activeBrief.research_questions.map((rq, idx) => (
                         <li key={idx}>{rq}</li>
                       ))}
                     </ul>
@@ -769,10 +832,10 @@ export function WorkspacePage() {
                     <strong className="text-slate-900">
                       Suggested Methodology:
                     </strong>{" "}
-                    {briefMutation.data.suggested_methodology}
+                    {activeBrief.suggested_methodology}
                   </p>
                   <p className="text-[11px] text-slate-500">
-                    {briefMutation.data.ai_generated_notice}
+                    {activeBrief.ai_generated_notice}
                   </p>
                 </div>
               )}

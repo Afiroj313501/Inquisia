@@ -159,3 +159,70 @@ def test_search_papers_handles_validation_and_upstream_errors(
     monkeypatch.setattr("app.services.paper_service.httpx.get", failing_get)
     err_res = client.get("/api/v1/papers/search?query=machine+learning", headers=headers)
     assert err_res.status_code == 502
+
+
+def test_synthesize_saved_papers_validation_and_gemini(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    headers = _auth_headers(client, "synth_user@example.edu")
+
+    # Requires at least 2 saved papers
+    assert client.post("/api/v1/papers/synthesize", headers=headers).status_code == 400
+
+    for idx in (1, 2):
+        res = client.post(
+            "/api/v1/papers/saved",
+            json={
+                "openalex_id": f"W{idx}",
+                "title": f"Real Paper {idx}",
+                "authors": ["Author A"],
+                "publication_year": 2024,
+                "abstract": f"Abstract for paper {idx}.",
+            },
+            headers=headers,
+        )
+        assert res.status_code == 201
+
+    class _WithKeySettings:
+        gemini_api_key = "test-gemini-key"
+        gemini_model = "gemini-2.5-flash"
+
+    class _FakeGeminiResp:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "text": (
+                                        '{"common_themes": ["Shared retrieval framing"],'
+                                        ' "methodological_gaps": ["Limited cross-domain eval"],'
+                                        ' "next_step_recommendation": "Benchmark both baselines."}'
+                                    )
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+
+    monkeypatch.setattr("app.services.brief_service.get_settings", lambda: _WithKeySettings())
+    monkeypatch.setattr(
+        "app.services.brief_service.httpx.post",
+        lambda *args, **kwargs: _FakeGeminiResp(),
+    )
+
+    synth_res = client.post("/api/v1/papers/synthesize", headers=headers)
+    assert synth_res.status_code == 200
+    body = synth_res.json()
+    assert body["paper_count"] == 2
+    assert body["common_themes"] == ["Shared retrieval framing"]
+    assert "AI-generated synthesis" in body["ai_generated_notice"]
+
+    latest_res = client.get("/api/v1/papers/synthesize/latest", headers=headers)
+    assert latest_res.status_code == 200
+    assert latest_res.json()["common_themes"] == ["Shared retrieval framing"]

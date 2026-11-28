@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -12,7 +12,7 @@ from app.schemas.recommendation import (
     RecommendationSetResponse,
     ResearchBriefResponse,
 )
-from app.services.brief_service import generate_topic_brief
+from app.services.brief_service import generate_topic_brief, get_cached_topic_brief
 from app.services.recommendation_service import (
     add_bookmark,
     generate_recommendations,
@@ -94,11 +94,22 @@ def submit_topic_feedback(
     return FeedbackResponse.model_validate(feedback)
 
 
-@router.post("/{topic_id}/brief", response_model=ResearchBriefResponse)
-def create_topic_brief(
+@router.get("/{topic_id}/brief", response_model=ResearchBriefResponse)
+def read_cached_topic_brief(
     topic_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ResearchBriefResponse:
-    """Generate an optional AI-assisted exploratory research brief for a topic."""
-    return generate_topic_brief(db, current_user.id, topic_id)
+    """Retrieve a cached AI research brief for a topic, if previously generated."""
+    return get_cached_topic_brief(db, current_user.id, topic_id)
+
+
+@router.post("/{topic_id}/brief", response_model=ResearchBriefResponse)
+def create_topic_brief(
+    topic_id: str,
+    refresh: bool = Query(default=False),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ResearchBriefResponse:
+    """Generate (or return cached) AI-assisted exploratory research brief for a topic."""
+    return generate_topic_brief(db, current_user.id, topic_id, refresh=refresh)
